@@ -2,8 +2,6 @@
 
 > Ameritrade OAuth2 strategy for Überauth.
 
-For additional documentation on Ameritrade's OAuth implementation see [ameritrade-oauth2-example](https://github.com/hammerandchisel/ameritrade-oauth2-example).
-
 ## Installation
 
 1. Setup your application at [Ameritrade Developers](https://developer.tdameritrade.com/user/me/apps).
