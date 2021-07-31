@@ -35,7 +35,7 @@
 
     ```elixir
     config :ueberauth, Ueberauth.Strategy.Ameritrade.OAuth,
-      client_id: System.get_env("AMERITRADE_KEY"),
+      client_id: System.get_env("AMERITRADE_KEY")
     ```
 
 1.  Include the Überauth plug in your controller:

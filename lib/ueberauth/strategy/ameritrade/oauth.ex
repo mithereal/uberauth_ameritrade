@@ -52,7 +52,6 @@ defmodule Ueberauth.Strategy.Ameritrade.OAuth do
 
   def get(token, url, headers \\ [], opts \\ []) do
     client(token: token)
-    |> put_param("client_secret", client().client_secret)
     |> OAuth2.Client.get(url, headers, opts)
   end
 
@@ -65,9 +64,7 @@ defmodule Ueberauth.Strategy.Ameritrade.OAuth do
     client =
       opts
       |> client
-       |> OAuth2.Client.get_token!(code: code)
-
-
+       |> get_token!(code: code)
   end
 
   # Strategy Callbacks
@@ -76,11 +73,50 @@ defmodule Ueberauth.Strategy.Ameritrade.OAuth do
     OAuth2.Strategy.AuthCode.authorize_url(client, params)
   end
 
+
   def get_token(client, params, headers) do
+    {code, params} = Keyword.pop(params, :code, client.params["code"])
+
+    unless code do
+      raise OAuth2.Error, reason: "Missing required key `code` for `#{inspect(__MODULE__)}`"
+    end
+
     client
-    |> put_param("client_secret", client.client_secret)
-    |> put_header("Accept", "application/json")
-    |> OAuth2.Strategy.AuthCode.get_token(params, headers)
+    |> put_param(:code, code)
+    |> put_param(:grant_type, "authorization_code")
+    |> put_param(:client_id, client.client_id)
+    |> put_param(:redirect_uri, client.redirect_uri)
+    |> merge_params(params)
+    |> basic_auth()
+    |> put_headers(headers)
+  end
+
+   def get_token!(client, params \\ [], headers \\ [], opts \\ []) do
+    case get_token(client, params, headers, opts) do
+      {:ok, client} ->
+        client
+
+      {:error, %Response{status_code: code, headers: headers, body: body}} ->
+        raise %Error{
+          reason: """
+          Server responded with status: #{code}
+
+          Headers:
+
+          #{Enum.reduce(headers, "", fn {k, v}, acc -> acc <> "#{k}: #{v}\n" end)}
+          Body:
+
+          #{inspect(body)}
+          """
+        }
+
+      {:error, error} ->
+        raise error
+    end
+  end
+
+    def basic_auth(%OAuth2.Client{client_id: id, client_secret: secret} = client) do
+    put_header(client, "authorization", "Basic " <> Base.encode64(id))
   end
 
 end
