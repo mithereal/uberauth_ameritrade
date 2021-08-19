@@ -83,7 +83,7 @@ defmodule Ueberauth.Strategy.Ameritrade do
       refresh_token: token.refresh_token,
       scopes: scopes,
       other: %{
-        refresh_token_expires_in: token.other_params["refresh_token_expires_in"]
+        expires: token.other_params["refresh_token_expires_in"]
       }
     }
   end
