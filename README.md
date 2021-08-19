@@ -10,7 +10,7 @@
 
     ```elixir
     def deps do
-      [{:ueberauth_ameritrade, "~> 0.1"}]
+      [{:ueberauth_ameritrade, "~> 1.0.0"}]
     end
     ```
 
@@ -84,4 +84,4 @@ config :ueberauth, Ueberauth,
 
 ## License
 
-Please see [LICENSE](https://github.com/schwarz/ueberauth_ameritrade/blob/master/LICENSE) for licensing details.
+Please see [LICENSE](https://github.com/mithereal/ueberauth_ameritrade/blob/master/LICENSE) for licensing details.

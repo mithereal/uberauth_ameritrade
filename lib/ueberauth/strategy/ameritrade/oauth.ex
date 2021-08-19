@@ -1,13 +1,4 @@
 defmodule Ueberauth.Strategy.Ameritrade.OAuth do
-  @moduledoc """
-  OAuth2 for Ameritrade.
-
-  Add `client_id`  to your configuration:
-
-  config :ueberauth, Ueberauth.Strategy.Ameritrade.OAuth,
-    client_id: System.get_env("AMERITRADE_KEY"),
-  """
-
   use OAuth2.Strategy
 
   @defaults [
@@ -17,22 +8,14 @@ defmodule Ueberauth.Strategy.Ameritrade.OAuth do
     token_url: "https://api.tdameritrade.com/v1/oauth2/token"
   ]
 
-  @doc """
-  Construct a client for requests to Ameritrade.
-  This will be setup automatically for you in `Ueberauth.Strategy.Ameritrade`.
-  These options are only useful for usage outside the normal callback phase
-  of Ueberauth.
-  """
   def client(opts \\ []) do
-    config = Application.get_env(:ueberauth, Ueberauth.Strategy.Ameritrade.OAuth)
+    config = Application.get_env(:ueberauth, __MODULE__, [])
 
-    client_id = [client_id: config[:client_id] <> "@AMER.OAUTHAP"]
+    client_id = config[:client_id] <> "@AMER.OAUTHAP"
 
-    opts =
-      @defaults
-      |> Keyword.merge(config)
-      |> Keyword.merge(opts)
-      |> Keyword.merge(client_id)
+    client_id = [client_id: client_id]
+
+    opts = @defaults |> Keyword.merge(opts) |> Keyword.merge(client_id) |> resolve_values()
 
     json_library = Ueberauth.json_library()
 
@@ -41,30 +24,48 @@ defmodule Ueberauth.Strategy.Ameritrade.OAuth do
   end
 
   @doc """
-  Provides the authorize url for the request phase of Ueberauth.
-  No need to call this usually.
+  Provides the authorize url for the request phase of Ueberauth. No need to call this usually.
   """
   def authorize_url!(params \\ [], opts \\ []) do
+    json_library = Ueberauth.json_library()
+
     opts
     |> client
     |> OAuth2.Client.authorize_url!(params)
   end
 
   def get(token, url, headers \\ [], opts \\ []) do
-    client(token: token)
+    [token: token]
+    |> client
     |> OAuth2.Client.get(url, headers, opts)
   end
 
-  def get_token(params \\ [], opts \\ []) do
-
-    code = params[:code]
-
-    code = URI.decode(code)
-
+  def get_token!(params \\ [], opts \\ []) do
     client =
-      opts
-      |> client
-       |> get_token!(code: code)
+      client(opts)
+      |> OAuth2.Client.get_token(params)
+
+    {_, token} =
+      case client do
+
+        {:error, %{body: %{"error" => description}, status_code: error}} ->
+          {:error,
+           %{
+             access_token: nil,
+             other_params: [
+               error: error,
+               error_description: description
+             ]
+           }}
+
+          {:ok, %{token: token}} ->
+          {:ok, token}
+
+        {:ok, %{body: %{token: token}}} ->
+          {:ok, token}
+      end
+
+    token
   end
 
   # Strategy Callbacks
@@ -72,7 +73,6 @@ defmodule Ueberauth.Strategy.Ameritrade.OAuth do
   def authorize_url(client, params) do
     OAuth2.Strategy.AuthCode.authorize_url(client, params)
   end
-
 
   def get_token(client, params, headers) do
     {code, params} = Keyword.pop(params, :code, client.params["code"])
@@ -82,41 +82,24 @@ defmodule Ueberauth.Strategy.Ameritrade.OAuth do
     end
 
     client
+    |> put_header("Accept", "application/json")
+    |> put_header("Content-Type", "application/x-www-form-urlencoded")
     |> put_param(:code, code)
     |> put_param(:grant_type, "authorization_code")
+    |> put_param(:access_type, "offline")
     |> put_param(:client_id, client.client_id)
     |> put_param(:redirect_uri, client.redirect_uri)
     |> merge_params(params)
-    |> basic_auth()
     |> put_headers(headers)
   end
 
-   def get_token!(client, params \\ [], headers \\ [], opts \\ []) do
-    case get_token(client, params, headers, opts) do
-      {:ok, client} ->
-        client
-
-      {:error, %Response{status_code: code, headers: headers, body: body}} ->
-        raise %Error{
-          reason: """
-          Server responded with status: #{code}
-
-          Headers:
-
-          #{Enum.reduce(headers, "", fn {k, v}, acc -> acc <> "#{k}: #{v}\n" end)}
-          Body:
-
-          #{inspect(body)}
-          """
-        }
-
-      {:error, error} ->
-        raise error
+  defp resolve_values(list) do
+    for {key, value} <- list do
+      {key, resolve_value(value)}
     end
   end
 
-    def basic_auth(%OAuth2.Client{client_id: id, client_secret: secret} = client) do
-    put_header(client, "authorization", "Basic " <> Base.encode64(id))
-  end
+  defp resolve_value({m, f, a}) when is_atom(m) and is_atom(f), do: apply(m, f, a)
+  defp resolve_value(v), do: v
 
 end
