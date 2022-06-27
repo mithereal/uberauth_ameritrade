@@ -3,7 +3,6 @@
 [![Hex.pm](https://img.shields.io/hexpm/dt/ueberauth_ameritrade.svg)](https://hex.pm/packages/ueberauth_ameritrade)
 [![License](https://img.shields.io/hexpm/l/ueberauth_ameritrade.svg)](https://github.com/mithereal/ueberauth_ameritrade/blob/master/LICENSE)
 [![Last Updated](https://img.shields.io/github/last-commit/mithereal/ueberauth_ameritrade.svg)](https://github.com/mithereal/ueberauth_ameritrade/commits/master)
-[![Build Status](https://circleci.com/gh/mithereal/ueberauth_ameritrade.svg?style=svg)](https://github.com/mithereal/ueberauth_ameritrade)
 
 # Überauth Ameritrade
 
