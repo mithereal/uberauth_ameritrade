@@ -3,7 +3,11 @@ defmodule Ueberauth.Strategy.Ameritrade do
   Ameritrade Strategy for Überauth.
   """
 
-  use Ueberauth.Strategy, uid_field: :userId, default_scope: "identify"
+  use Ueberauth.Strategy,
+    uid_field: :userId,
+    default_scope: "identify",
+    send_redirect_uri: true,
+    oauth2_module: Ueberauth.Strategy.Ameritrade.OAuth
 
   alias Ueberauth.Auth.Info
   alias Ueberauth.Auth.Credentials
@@ -17,16 +21,22 @@ defmodule Ueberauth.Strategy.Ameritrade do
   def handle_request!(conn) do
     config = Application.get_env(:ueberauth, Ueberauth.Strategy.Ameritrade.OAuth)
 
-    opts = options_from_conn(conn)
+    opts =
+      options_from_conn(conn)
+      |> with_scopes(conn)
+      |> with_state_param(conn)
+      |> with_redirect_uri(conn)
 
-    redirect!(conn, OAuth.authorize_url!(opts))
+    module = option(conn, :oauth2_module)
+    redirect!(conn, apply(module, :authorize_url!, [opts]))
   end
 
   @doc false
   def handle_callback!(%Plug.Conn{params: %{"code" => code}} = conn) do
     opts = [redirect_uri: callback_url(conn)]
 
-    token = OAuth.get_token!([code: code], opts)
+    module = option(conn, :oauth2_module)
+    token = apply(module, :get_token!, [[code: code], opts])
 
     if token.access_token == nil do
       err = token.other_params[:error]
@@ -56,7 +66,6 @@ defmodule Ueberauth.Strategy.Ameritrade do
   defp store_token(conn, token) do
     put_private(conn, :ameritrade_token, token)
   end
-
 
   @doc """
   Fetches the fields to populate the info section of the `Ueberauth.Auth` struct.
@@ -95,7 +104,7 @@ defmodule Ueberauth.Strategy.Ameritrade do
   def extra(conn) do
     %{
       ameritrade_token: :token,
-      ameritrade_user: :user,
+      ameritrade_user: :user
     }
     |> Enum.filter(fn {original_key, _} ->
       Map.has_key?(conn.private, original_key)
@@ -107,7 +116,7 @@ defmodule Ueberauth.Strategy.Ameritrade do
     |> (&%Extra{raw_info: &1}).()
   end
 
-    @doc """
+  @doc """
   Fetches the uid field from the response.
   """
   def uid(conn) do
@@ -123,6 +132,20 @@ defmodule Ueberauth.Strategy.Ameritrade do
     Keyword.get(options(conn), key, Keyword.get(default_options(), key))
   end
 
+  defp with_scopes(opts, conn) do
+    scopes = conn.params["scope"] || option(conn, :default_scope)
+
+    opts |> Keyword.put(:scope, scopes)
+  end
+
+  defp with_redirect_uri(opts, conn) do
+    if option(conn, :send_redirect_uri) do
+      opts |> Keyword.put(:redirect_uri, callback_url(conn))
+    else
+      opts
+    end
+  end
+
   defp options_from_conn(conn) do
     base_options = [redirect_uri: callback_url(conn)]
     request_options = conn.private[:ueberauth_request_options].options
@@ -134,7 +157,7 @@ defmodule Ueberauth.Strategy.Ameritrade do
     end
   end
 
-    defp split_scopes(token) do
+  defp split_scopes(token) do
     (token.other_params["scope"] || "")
     |> String.split(" ")
   end
@@ -149,7 +172,6 @@ defmodule Ueberauth.Strategy.Ameritrade do
 
       {:ok, %OAuth2.Response{status_code: status_code, body: user}}
       when status_code in 200..399 ->
-
         put_private(conn, :ameritrade_user, user)
 
       {:error, %OAuth2.Error{reason: reason}} ->
